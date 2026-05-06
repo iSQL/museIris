@@ -1,0 +1,17 @@
+{
+  "name": "muse-iris",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Muse Iris atelier — booking app (Vite + React frontend, Express + SQLite backend).",
+  "scripts": {
+    "dev": "concurrently -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "seed": "npm --prefix server run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
