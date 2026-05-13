@@ -168,7 +168,10 @@ export default function ClientApp() {
                 services={services}
                 categories={categories}
                 selected={selectedService}
-                onSelect={setSelectedService}
+                onSelect={(s) => {
+                  setSelectedService(s);
+                  setStep(1);
+                }}
               />
             )}
             {step === 1 && (
@@ -177,6 +180,7 @@ export default function ClientApp() {
                 onSelect={(d) => {
                   setSelectedDate(d);
                   setSelectedTime(null);
+                  setStep(2);
                 }}
                 workingHours={workingHours}
               />
@@ -186,7 +190,10 @@ export default function ClientApp() {
                 slots={slots}
                 loading={slotsLoading}
                 selected={selectedTime}
-                onSelect={setSelectedTime}
+                onSelect={(t) => {
+                  setSelectedTime(t);
+                  setStep(3);
+                }}
                 date={selectedDate}
                 service={selectedService}
               />
