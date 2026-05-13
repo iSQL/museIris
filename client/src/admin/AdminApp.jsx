@@ -97,6 +97,7 @@ function Dashboard({ onUnauthed }) {
       approved: bookings.filter((b) => b.status === "approved").length,
       completed: bookings.filter((b) => b.status === "completed").length,
       rejected: bookings.filter((b) => b.status === "rejected").length,
+      canceled: bookings.filter((b) => b.status === "canceled").length,
     }),
     [bookings]
   );

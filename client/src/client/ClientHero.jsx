@@ -6,7 +6,7 @@ export default function ClientHero() {
     <header
       style={{
         position: "relative",
-        padding: "100px 32px 80px",
+        padding: "clamp(60px, 8vw, 100px) clamp(20px, 4vw, 32px) clamp(50px, 6vw, 80px)",
         overflow: "hidden",
         background: "linear-gradient(180deg, #0a0506 0%, #0a0809 80%)",
       }}
@@ -36,15 +36,15 @@ export default function ClientHero() {
       <div style={{ position: "relative", maxWidth: 1100, margin: "0 auto" }}>
         <BrandMark size={56} withName tagline="atelier" />
 
-        <div style={{ marginTop: 70, maxWidth: 640 }}>
+        <div style={{ marginTop: "clamp(40px, 7vw, 70px)", maxWidth: 640 }}>
           <span className="eyebrow">SALON NOKTIJU · ŽABARI</span>
-          <h1 className="h-display" style={{ fontSize: 80, marginTop: 16, marginBottom: 24 }}>
+          <h1 className="h-display" style={{ fontSize: "clamp(40px, 8vw, 80px)", marginTop: 16, marginBottom: 24 }}>
             Negovani <em style={{ fontStyle: "italic", color: "var(--gold)" }}>detalji</em>,<br />
             tihi <em style={{ fontStyle: "italic", color: "var(--gold)" }}>luksuz</em>.
           </h1>
           <p
             style={{
-              fontSize: 17, color: "var(--parchment-dim)", lineHeight: 1.7,
+              fontSize: "clamp(15px, 1.6vw, 17px)", color: "var(--parchment-dim)", lineHeight: 1.7,
               maxWidth: 480, marginBottom: 36,
             }}
           >

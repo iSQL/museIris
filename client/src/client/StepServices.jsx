@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmtRSD, fmtDur } from "../data/format.js";
 import StepHeading from "./StepHeading.jsx";
 
 export default function StepServices({ services, categories, selected, onSelect }) {
   const [activeCat, setActiveCat] = useState(categories[0] || "");
+
+  useEffect(() => {
+    if (!categories.length) return;
+    if (!categories.includes(activeCat)) setActiveCat(categories[0]);
+  }, [categories, activeCat]);
+
   const list = services.filter((s) => s.cat === activeCat);
 
   return (
@@ -14,7 +20,7 @@ export default function StepServices({ services, categories, selected, onSelect 
         sub="Sve usluge obavlja master Milena lično, u svom ritmu."
       />
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 28, borderBottom: "1px solid var(--line-soft)" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 28, borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
         {categories.map((c) => (
           <button
             key={c}
@@ -24,6 +30,7 @@ export default function StepServices({ services, categories, selected, onSelect 
               border: 0,
               cursor: "pointer",
               padding: "12px 22px",
+              whiteSpace: "nowrap",
               fontFamily: "var(--serif)",
               fontSize: 18,
               fontStyle: activeCat === c ? "italic" : "normal",

@@ -9,9 +9,10 @@ import { requireAuth } from "../middleware/requireAuth.js";
 const router = Router();
 
 const ALLOWED_TRANSITIONS = {
-  pending: new Set(["approved", "rejected"]),
-  approved: new Set(["completed", "rejected"]),
+  pending: new Set(["approved", "rejected", "canceled"]),
+  approved: new Set(["completed", "canceled"]),
   rejected: new Set(["pending"]),
+  canceled: new Set(["pending"]),
   completed: new Set(),
 };
 
@@ -158,7 +159,7 @@ router.post("/by-token/:token/cancel", async (req, res, next) => {
     }
 
     await query(
-      "UPDATE bookings SET status = 'rejected', updated_at = NOW() WHERE id = $1",
+      "UPDATE bookings SET status = 'canceled', updated_at = NOW() WHERE id = $1",
       [row.id]
     );
     const { rows: out } = await query(

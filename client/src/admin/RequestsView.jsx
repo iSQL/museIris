@@ -144,12 +144,12 @@ function RequestDetail({ services, booking, setStatus, onClose }) {
             <button className="btn btn-gold" onClick={() => setStatus(booking.id, "completed")}>
               Označi obavljenim
             </button>
-            <button className="btn btn-ghost" onClick={() => setStatus(booking.id, "rejected")}>
+            <button className="btn btn-ghost" onClick={() => setStatus(booking.id, "canceled")}>
               Otkaži
             </button>
           </>
         )}
-        {booking.status === "rejected" && (
+        {(booking.status === "rejected" || booking.status === "canceled") && (
           <button className="btn btn-ghost" onClick={() => setStatus(booking.id, "pending")}>
             Vrati na čekanje
           </button>
@@ -190,6 +190,7 @@ export default function RequestsView({
     { id: "approved", label: "Potvrđeno", count: counts.approved },
     { id: "completed", label: "Obavljeno", count: counts.completed },
     { id: "rejected", label: "Odbijeno", count: counts.rejected },
+    { id: "canceled", label: "Otkazano", count: counts.canceled },
   ];
 
   const list = bookings

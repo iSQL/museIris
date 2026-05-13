@@ -6,7 +6,7 @@ export default function StepConfirmed({ id, service, date, time, onReset }) {
   return (
     <div style={{ textAlign: "center", padding: "20px 0 10px" }}>
       <Ornament width={50} />
-      <span className="eyebrow" style={{ marginTop: 18, display: "inline-block" }}>
+      <span className="eyebrow" style={{ marginTop: 18, display: "block" }}>
         Hvala vam
       </span>
       <h2 className="h-display" style={{ fontSize: 48, margin: "10px 0 14px" }}>

@@ -3,6 +3,7 @@ const MAP = {
   approved: ["chip-ok", "Potvrđeno"],
   completed: ["chip-gold", "Obavljeno"],
   rejected: ["chip-bad", "Odbijeno"],
+  canceled: ["chip-mute", "Otkazano"],
 };
 
 export default function StatusChip({ status }) {

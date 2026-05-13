@@ -13,7 +13,7 @@ export default function StepDate({ selected, onSelect, workingHours }) {
         title="Izaberite datum"
         sub="Slobodno možete birati do 60 dana unapred. Nedeljom ne radimo."
       />
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,360px)", gap: 32, alignItems: "start" }}>
+      <div className="step-date-grid">
         <MonthCalendar
           value={selected}
           onChange={onSelect}

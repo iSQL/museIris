@@ -330,7 +330,7 @@ function BookingRow({ booking, services, onReschedule, onChanged }) {
               </button>
             </>
           )}
-          {!editable && booking.status !== "completed" && booking.status !== "rejected" && (
+          {!editable && booking.status !== "completed" && booking.status !== "rejected" && booking.status !== "canceled" && (
             <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", fontFamily: "var(--serif)", textAlign: "right", maxWidth: 200 }}>
               Manje od 4h do termina — promene su moguće samo telefonom.
             </span>
@@ -340,9 +340,14 @@ function BookingRow({ booking, services, onReschedule, onChanged }) {
               Termin je obavljen. Hvala!
             </span>
           )}
-          {booking.status === "rejected" && (
+          {booking.status === "canceled" && (
             <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", fontFamily: "var(--serif)", textAlign: "right" }}>
               Termin je otkazan.
+            </span>
+          )}
+          {booking.status === "rejected" && (
+            <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", fontFamily: "var(--serif)", textAlign: "right" }}>
+              Termin je odbijen.
             </span>
           )}
         </div>

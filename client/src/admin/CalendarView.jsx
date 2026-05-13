@@ -37,7 +37,7 @@ export default function CalendarView({ services, bookings }) {
     if (!d) return [];
     const iso = isoDate(d);
     return bookings
-      .filter((b) => b.date === iso && b.status !== "rejected")
+      .filter((b) => b.date === iso && b.status !== "rejected" && b.status !== "canceled")
       .sort((a, b) => a.time.localeCompare(b.time));
   }
 

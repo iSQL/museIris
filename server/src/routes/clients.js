@@ -34,7 +34,7 @@ router.get("/", async (_req, res, next) => {
       if (b.status === "completed" || b.status === "approved") prev.visits += 1;
       if (!prev.lastDate || dateStr > prev.lastDate) prev.lastDate = dateStr;
       const svc = byId.get(b.service_id);
-      if (svc && b.status !== "rejected") {
+      if (svc && b.status !== "rejected" && b.status !== "canceled") {
         if (b.status === "completed") prev.spent += svc.price;
         prev._cats[svc.cat] = (prev._cats[svc.cat] || 0) + 1;
       }

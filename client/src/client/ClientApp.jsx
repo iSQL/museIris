@@ -123,10 +123,10 @@ export default function ClientApp() {
     <div style={{ minHeight: "100vh", paddingBottom: 60 }}>
       <ClientHero />
 
-      <section id="booking" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px" }}>
+      <section id="booking" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 clamp(16px, 3vw, 32px)" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <span className="eyebrow">Zakazivanje termina</span>
-          <h2 className="h-display" style={{ fontSize: 44, marginTop: 10, marginBottom: 10 }}>
+          <h2 className="h-display" style={{ fontSize: "clamp(28px, 5vw, 44px)", marginTop: 10, marginBottom: 10 }}>
             <em style={{ fontStyle: "italic", color: "var(--gold)" }}>Pet</em> koraka do vašeg termina
           </h2>
           <Ornament width={60} />
@@ -162,7 +162,7 @@ export default function ClientApp() {
               background: "linear-gradient(90deg, transparent, var(--bronze-deep), transparent)",
             }}
           />
-          <div style={{ padding: 40 }}>
+          <div style={{ padding: "clamp(20px, 3vw, 40px)" }}>
             {step === 0 && (
               <StepServices
                 services={services}
@@ -206,7 +206,7 @@ export default function ClientApp() {
           {step !== 4 && (
             <div
               style={{
-                padding: "20px 40px",
+                padding: "20px clamp(20px, 3vw, 40px)",
                 borderTop: "1px solid var(--line-soft)",
                 background: "rgba(0,0,0,0.3)",
                 display: "flex",
