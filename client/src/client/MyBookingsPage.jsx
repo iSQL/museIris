@@ -22,6 +22,17 @@ function withinEditWindow(b) {
   return (target.getTime() - Date.now()) / 60_000 > EDIT_WINDOW_MIN;
 }
 
+// A booking is "arhivirano" once it's no longer actionable from the client side:
+// finished/declined/cancelled, or its scheduled date has already passed.
+function isArchived(b) {
+  if (!b) return false;
+  if (b.status === "rejected" || b.status === "canceled" || b.status === "completed") return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${b.date}T${b.time || "00:00"}:00`);
+  return target < today;
+}
+
 export default function MyBookingsPage() {
   const [services, setServices] = useState([]);
   const [workingHours, setWorkingHours] = useState({});
@@ -96,6 +107,23 @@ export default function MyBookingsPage() {
 
   const entries = listEntries();
 
+  function hideEntry(id) {
+    removeEntry(id);
+    refresh();
+  }
+
+  function hideAllArchived() {
+    const toHide = bookings
+      .filter(({ booking }) => booking && isArchived(booking))
+      .map(({ booking }) => booking.id);
+    if (toHide.length === 0) return;
+    if (!confirm(`Sakriti ${toHide.length} završen${toHide.length === 1 ? "" : "ih"} termin${toHide.length === 1 ? "" : "a"} iz ove liste?`)) return;
+    toHide.forEach((id) => removeEntry(id));
+    refresh();
+  }
+
+  const archivedCount = bookings.filter(({ booking }) => booking && isArchived(booking)).length;
+
   if (loading && entries.length > 0) {
     return (
       <PageShell>
@@ -117,6 +145,23 @@ export default function MyBookingsPage() {
   return (
     <>
       <PageShell>
+        {archivedCount > 0 && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: 14,
+            }}
+          >
+            <button
+              className="btn btn-ghost"
+              onClick={hideAllArchived}
+              style={{ padding: "10px 18px" }}
+            >
+              Sakrij završene termine ({archivedCount})
+            </button>
+          </div>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {bookings.map(({ booking, error, _entry }) =>
             booking ? (
@@ -126,6 +171,7 @@ export default function MyBookingsPage() {
                 services={services}
                 onReschedule={() => setRescheduleTarget(booking)}
                 onChanged={refresh}
+                onHide={() => hideEntry(booking.id)}
               />
             ) : (
               <ErrorRow key={_entry?.id || Math.random()} entry={_entry} error={error} onForget={refresh} />
@@ -236,7 +282,7 @@ function EmptyState() {
   );
 }
 
-function BookingRow({ booking, services, onReschedule, onChanged }) {
+function BookingRow({ booking, services, onReschedule, onChanged, onHide }) {
   const svc = services.find((s) => s.id === booking.service);
   const [note, setNote] = useState(booking.note || "");
   const [noteDirty, setNoteDirty] = useState(false);
@@ -349,6 +395,15 @@ function BookingRow({ booking, services, onReschedule, onChanged }) {
             <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", fontFamily: "var(--serif)", textAlign: "right" }}>
               Termin je odbijen.
             </span>
+          )}
+          {isArchived(booking) && (
+            <button
+              className="btn btn-ghost"
+              onClick={onHide}
+              style={{ padding: "8px 14px", fontSize: 10 }}
+            >
+              Ukloni iz liste
+            </button>
           )}
         </div>
       </div>

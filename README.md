@@ -106,13 +106,14 @@ These bit us during the first deploy. Worth knowing up front:
 - 5-step booking flow: service → date → time → details → confirmation.
 - Service catalogue at `/services` with per-card "Zakaži" deep-link that pre-selects the service in the flow.
 - "Moji termini" at `/me`: reads per-booking access tokens from `localStorage`, fetches current state from the server, polls every 30s while the tab is visible.
-- Customer can reschedule, edit the note, or cancel — up to **4 hours** before the appointment. Server enforces the same cutoff.
+- Customer can reschedule, edit the note, or cancel — up to **4 hours** before the appointment. Server enforces the same cutoff. A customer-initiated cancel sets status to `canceled` (distinct from an admin `rejected`).
+- Archived bookings (rejected / canceled / completed / past) can be hidden from the list either one-by-one ("Ukloni iz liste") or in bulk ("Sakrij završene termine"). Hiding only forgets the access token in this device's `localStorage`; the row stays in the database and remains visible to admins. The cache also auto-prunes anything more than 30 days past its booking date.
 - Rescheduling a booking that is already `approved` reverts its status to `pending` so Milena re-confirms the new slot.
 
 **Admin (gated by single shared password)**
 - Login screen at `/admin` (no separate URL). JWT in httpOnly cookie, 7-day TTL.
 - Dashboard: **Pregled** (overview) · **Zahtevi** (requests + filters + detail panel) · **Kalendar** (month grid) · **Klijenti** (aggregated client list) · **Usluge** (service CRUD) · **Podešavanja** (working hours, slot step, lead time).
-- Booking actions: approve / reject / mark completed (subject to the state machine below).
+- Booking actions: approve / reject (declined while pending) / cancel (called off after approval) / mark completed / reopen to pending (subject to the state machine below).
 - Service actions: create / edit / archive / hard-delete. Hard delete is blocked (`409`) when bookings reference the service; the modal offers "Arhiviraj umesto toga" as a one-click fallback.
 - Settings: per-day open/close pickers (Sundays closeable), 4-option slot raster (15/30/45/60 min), lead-time minutes. Changes take effect immediately for new bookings + availability queries.
 - "Odjavi se" in the sidebar.
@@ -120,23 +121,35 @@ These bit us during the first deploy. Worth knowing up front:
 ### Booking state machine
 
 ```
-              ┌──────────────────┐
-              │     pending      │ ← POST /api/bookings
-              └──────┬──────┬────┘
-                     │      │
-            approved │      │ rejected
-                     ▼      ▼
-              ┌──────────┐ ┌──────────┐
-              │ approved │ │ rejected │ ── customer cancel from /me
-              └──┬───┬───┘ └──────────┘    or admin reject
-                 │   │            ▲
-       completed │   │ rejected   │ (customer reschedules approved → pending)
-                 ▼   ▼            │
-            ┌───────────┐         │
-            │ completed │         │
-            └───────────┘         │
-              (terminal)
+                  ┌──────────────────┐
+                  │     pending      │ ← POST /api/bookings
+                  └──┬──────┬────┬───┘
+                     │      │    │
+            approved │      │    │ rejected  (admin declines incoming request)
+                     │      │    ▼
+                     │      │  ┌──────────┐
+                     │      │  │ rejected │ ──┐
+                     │      │  └──────────┘   │
+                     │      │ canceled        │ reopen → pending
+                     │      ▼  (customer       │ (admin "Vrati na čekanje")
+                     │   ┌──────────┐         │
+                     │   │ canceled │ ────────┤
+                     │   └──────────┘         │
+                     ▼                        │
+              ┌──────────┐                    │
+              │ approved │ ── canceled ───────┤  (customer cancel from /me,
+              └────┬─────┘                    │   or admin "Otkaži" approved)
+                   │                          │
+         completed │                          │
+                   ▼                          │
+            ┌───────────┐                     │
+            │ completed │  (terminal)         │
+            └───────────┘                     │
+                                              │
+       (customer reschedules approved → pending; admin reopens cancelled/rejected → pending)
 ```
+
+`rejected` and `canceled` are functionally equivalent (both free the slot, both shown as "archived" to the customer) but kept distinct so the chip can read **"Odbijeno"** vs **"Otkazano"** — admin rejection vs customer self-cancellation.
 
 ## API
 
