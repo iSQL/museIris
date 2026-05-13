@@ -1,0 +1,25 @@
+node_modules
+**/node_modules
+client/dist
+.git
+.gitignore
+.env
+.env.*
+**/.env
+**/.env.*
+.vscode
+.idea
+.claude
+.DS_Store
+*.log
+npm-debug.log*
+
+# Legacy SQLite artifacts (pre-Postgres)
+server/data.db
+server/data.db-journal
+server/data.db-wal
+server/data.db-shm
+
+# Plan files / docs
+*.md
+!README.md

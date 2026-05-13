@@ -1,5 +1,11 @@
-import { db } from "../db.js";
-import { WORKING_HOURS, SLOT_STEP, LEAD_TIME_MIN, findService, SERVICES } from "../data/services.js";
+import { query } from "../db.js";
+import {
+  WORKING_HOURS,
+  SLOT_STEP,
+  LEAD_TIME_MIN,
+  findService,
+  SERVICES,
+} from "../data/services.js";
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const toMin = (hhmm) => {
@@ -8,22 +14,36 @@ const toMin = (hhmm) => {
 };
 const fromMin = (m) => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
 
-const takenStmt = db.prepare(
-  "SELECT service_id, time FROM bookings WHERE date = ? AND status IN ('pending','approved')"
-);
-
-// Returns the array of taken minute ranges for `date` (YYYY-MM-DD).
-export function takenRangesOn(date) {
-  return takenStmt.all(date).map((row) => {
+function rowsToRanges(rows) {
+  return rows.map((row) => {
     const svc = SERVICES.find((s) => s.id === row.service_id);
-    const start = toMin(row.time);
+    const t = typeof row.time === "string" ? row.time.slice(0, 5) : row.time;
+    const start = toMin(t);
     return [start, start + (svc?.duration || 60)];
   });
 }
 
+// Fetch active bookings for `date`, optionally excluding one (used by reschedule).
+async function fetchTaken(date, ignoreBookingId = null) {
+  const params = [date];
+  let sql =
+    "SELECT id, service_id, time FROM bookings WHERE date = $1 AND status IN ('pending','approved')";
+  if (ignoreBookingId) {
+    params.push(ignoreBookingId);
+    sql += " AND id <> $2";
+  }
+  const { rows } = await query(sql, params);
+  return rowsToRanges(rows);
+}
+
+// Returns taken minute ranges for `date` (YYYY-MM-DD).
+export async function takenRangesOn(date, ignoreBookingId = null) {
+  return fetchTaken(date, ignoreBookingId);
+}
+
 // Server-mirrored equivalent of the prototype's StepTime slot generator.
 // Returns [{ time: "HH:MM", taken, past }] for the (date, service) pair.
-export function generateSlots(date, serviceId, ignoreBookingId = null) {
+export async function generateSlots(date, serviceId, ignoreBookingId = null) {
   const service = findService(serviceId);
   if (!service) return [];
   const d = new Date(`${date}T00:00:00`);
@@ -36,17 +56,12 @@ export function generateSlots(date, serviceId, ignoreBookingId = null) {
   const openM = toMin(open);
   const closeM = toMin(close);
 
-  const taken = takenStmt
-    .all(date)
-    .filter((row) => row.id !== ignoreBookingId)
-    .map((row) => {
-      const svc = SERVICES.find((s) => s.id === row.service_id);
-      const start = toMin(row.time);
-      return [start, start + (svc?.duration || 60)];
-    });
+  const taken = await fetchTaken(date, ignoreBookingId);
 
   const now = new Date();
-  const todayIso = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  const todayIso = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
+    now.getDate()
+  )}`;
   const isToday = date === todayIso;
   const nowM = now.getHours() * 60 + now.getMinutes();
 
@@ -60,7 +75,8 @@ export function generateSlots(date, serviceId, ignoreBookingId = null) {
 }
 
 // Returns null if the slot is fine to book; an error message otherwise.
-export function validateSlot(date, time, serviceId) {
+// `ignoreBookingId` lets reschedule exclude the booking being moved.
+export async function validateSlot(date, time, serviceId, ignoreBookingId = null) {
   const service = findService(serviceId);
   if (!service) return "Nepoznata usluga.";
 
@@ -79,14 +95,18 @@ export function validateSlot(date, time, serviceId) {
   }
 
   const now = new Date();
-  const todayIso = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  const todayIso = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
+    now.getDate()
+  )}`;
   if (date < todayIso) return "Termin je u prošlosti.";
   if (date === todayIso) {
     const nowM = now.getHours() * 60 + now.getMinutes();
-    if (t < nowM + LEAD_TIME_MIN) return "Termin se zakazuje najmanje 30 minuta unapred.";
+    if (t < nowM + LEAD_TIME_MIN)
+      return "Termin se zakazuje najmanje 30 minuta unapred.";
   }
 
-  const overlaps = takenRangesOn(date).some(([s, e]) => t < e && t + service.duration > s);
+  const taken = await fetchTaken(date, ignoreBookingId);
+  const overlaps = taken.some(([s, e]) => t < e && t + service.duration > s);
   if (overlaps) return "Termin je već zauzet.";
 
   return null;

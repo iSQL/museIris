@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import * as api from "../api.js";
+import { addEntry } from "../lib/myBookings.js";
 import Stepper from "../components/Stepper.jsx";
 import Ornament from "../components/Ornament.jsx";
 import { isoDate } from "../data/format.js";
@@ -98,6 +99,7 @@ export default function ClientApp() {
         client: { name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim() },
         note: form.note.trim(),
       });
+      addEntry({ id: res.booking.id, accessToken: res.accessToken });
       setSubmittedId(res.booking.id);
       setStep(4);
     } catch (err) {

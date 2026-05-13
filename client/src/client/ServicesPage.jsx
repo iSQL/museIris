@@ -55,9 +55,14 @@ export default function ServicesPage() {
           }}
         >
           <BrandMark size={48} withName tagline="atelier" />
-          <Link to="/" className="btn btn-ghost" style={{ padding: "10px 18px" }}>
-            ← Nazad na početnu
-          </Link>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link to="/me" className="btn btn-ghost" style={{ padding: "10px 18px" }}>
+              Moji termini
+            </Link>
+            <Link to="/" className="btn btn-ghost" style={{ padding: "10px 18px" }}>
+              ← Nazad na početnu
+            </Link>
+          </div>
         </div>
       </header>
 

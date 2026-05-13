@@ -1,7 +1,10 @@
 // Thin fetch wrappers around the Express backend (proxied at /api by Vite).
+// Admin endpoints carry the session cookie; the same `credentials: "include"`
+// is harmless on public endpoints, so apply it uniformly.
 
 async function jsonFetch(path, options = {}) {
   const res = await fetch(path, {
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
@@ -20,24 +23,49 @@ async function jsonFetch(path, options = {}) {
   return body;
 }
 
+// ─── public ────────────────────────────────────────────────────────────────
 export const getServices = () => jsonFetch("/api/services");
 export const getWorkingHours = () => jsonFetch("/api/working-hours");
 
+export const createBooking = (payload) =>
+  jsonFetch("/api/bookings", { method: "POST", body: JSON.stringify(payload) });
+
+export const getAvailability = (date, serviceId, excludeId) => {
+  const qs = new URLSearchParams({ date, serviceId });
+  if (excludeId) qs.set("excludeId", excludeId);
+  return jsonFetch(`/api/bookings/availability?${qs.toString()}`);
+};
+
+// ─── customer self-service (by token) ──────────────────────────────────────
+export const getBookingByToken = (token) =>
+  jsonFetch(`/api/bookings/by-token/${encodeURIComponent(token)}`);
+
+export const patchBookingByToken = (token, edits) =>
+  jsonFetch(`/api/bookings/by-token/${encodeURIComponent(token)}`, {
+    method: "PATCH",
+    body: JSON.stringify(edits),
+  });
+
+export const cancelBookingByToken = (token) =>
+  jsonFetch(`/api/bookings/by-token/${encodeURIComponent(token)}/cancel`, {
+    method: "POST",
+  });
+
+// ─── admin ─────────────────────────────────────────────────────────────────
 export const listBookings = (status) => {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
   return jsonFetch(`/api/bookings${qs}`);
 };
 export const getBooking = (id) => jsonFetch(`/api/bookings/${encodeURIComponent(id)}`);
-export const getAvailability = (date, serviceId) =>
-  jsonFetch(
-    `/api/bookings/availability?date=${encodeURIComponent(date)}&serviceId=${encodeURIComponent(serviceId)}`
-  );
-export const createBooking = (payload) =>
-  jsonFetch("/api/bookings", { method: "POST", body: JSON.stringify(payload) });
 export const updateBookingStatus = (id, status) =>
   jsonFetch(`/api/bookings/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
-
 export const listClients = () => jsonFetch("/api/clients");
+
+// ─── auth ──────────────────────────────────────────────────────────────────
+export const login = (password) =>
+  jsonFetch("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) });
+export const logout = () => jsonFetch("/api/auth/logout", { method: "POST" });
+export const me = () => jsonFetch("/api/auth/me");

@@ -1,6 +1,6 @@
 import BrandMark from "../components/BrandMark.jsx";
 
-export default function AdminSidebar({ view, setView, counts }) {
+export default function AdminSidebar({ view, setView, counts, onLogout }) {
   const items = [
     { id: "overview", label: "Pregled" },
     { id: "requests", label: "Zahtevi", badge: counts.pending },
@@ -59,6 +59,29 @@ export default function AdminSidebar({ view, setView, counts }) {
             Milena M.
           </div>
           <div style={{ fontSize: 11, color: "var(--muted)" }}>master · vlasnik</div>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              style={{
+                marginTop: 12,
+                background: "transparent",
+                border: 0,
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "var(--sans)",
+                fontSize: 10,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                transition: "color .2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--gold)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted)")}
+            >
+              Odjavi se →
+            </button>
+          )}
         </div>
       </div>
     </aside>

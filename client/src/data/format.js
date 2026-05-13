@@ -28,3 +28,27 @@ export const fmtDateLong = (d) =>
 
 export const fmtDateShort = (d) =>
   `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`;
+
+// Best-effort Serbian (Latin) relative-time formatter. Returns strings like
+// "upravo", "pre 12 minuta", "pre 3 sata", "juče", "pre 5 dana", or a fmtDateShort
+// fallback for distant dates. Accepts a Date or an ISO string.
+export function fmtRelativeTime(input) {
+  if (!input) return "";
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return "";
+  const diffMs = Date.now() - d.getTime();
+  const sec = Math.round(diffMs / 1000);
+  const min = Math.round(sec / 60);
+  const hr = Math.round(min / 60);
+  const day = Math.round(hr / 24);
+
+  if (sec < 45) return "upravo";
+  if (min < 2) return "pre minut";
+  if (min < 60) return `pre ${min} minuta`;
+  if (hr < 2) return "pre sat vremena";
+  if (hr < 5) return `pre ${hr} sata`;
+  if (hr < 24) return `pre ${hr} sati`;
+  if (day === 1) return "juče";
+  if (day < 7) return `pre ${day} dana`;
+  return fmtDateShort(d);
+}

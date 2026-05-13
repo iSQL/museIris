@@ -1,4 +1,4 @@
-import { fmtRSD, fmtDur, fmtDateLong, fmtDateShort } from "../data/format.js";
+import { fmtRSD, fmtDur, fmtDateLong, fmtDateShort, fmtRelativeTime } from "../data/format.js";
 import StatusChip from "../components/StatusChip.jsx";
 
 function DetailRow({ label, value, highlight }) {
@@ -98,7 +98,7 @@ function RequestDetail({ services, booking, setStatus, onClose }) {
       <DetailRow label="Cena" value={fmtRSD(svc?.price || 0)} highlight />
       <DetailRow label="Datum" value={fmtDateLong(new Date(booking.date))} />
       <DetailRow label="Vreme" value={booking.time} highlight />
-      <DetailRow label="Poslato" value={booking.created} />
+      <DetailRow label="Poslato" value={fmtRelativeTime(booking.created)} />
 
       {booking.note && (
         <div

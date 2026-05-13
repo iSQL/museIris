@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "../api.js";
 import { isoDate } from "../data/format.js";
 
+import Login from "./Login.jsx";
 import AdminSidebar from "./AdminSidebar.jsx";
 import AdminHeader from "./AdminHeader.jsx";
 import OverviewView from "./OverviewView.jsx";
@@ -9,7 +10,38 @@ import RequestsView from "./RequestsView.jsx";
 import CalendarView from "./CalendarView.jsx";
 import ClientsView from "./ClientsView.jsx";
 
+// auth state: null = checking, false = logged out, true = logged in
 export default function AdminApp() {
+  const [authed, setAuthed] = useState(null);
+
+  useEffect(() => {
+    api
+      .me()
+      .then((res) => setAuthed(!!res.authed))
+      .catch(() => setAuthed(false));
+  }, []);
+
+  if (authed === null) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          color: "var(--muted)",
+          fontFamily: "var(--serif)",
+          fontStyle: "italic",
+        }}
+      >
+        Učitavanje…
+      </div>
+    );
+  }
+  if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
+  return <Dashboard onUnauthed={() => setAuthed(false)} />;
+}
+
+function Dashboard({ onUnauthed }) {
   const [services, setServices] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [view, setView] = useState("requests");
@@ -18,14 +50,32 @@ export default function AdminApp() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState(null);
 
+  // Wrap async admin calls so a 401 drops us back to Login automatically.
+  const guard = useCallback(
+    async (fn) => {
+      try {
+        return await fn();
+      } catch (err) {
+        if (err?.status === 401) {
+          onUnauthed();
+          return null;
+        }
+        throw err;
+      }
+    },
+    [onUnauthed]
+  );
+
   useEffect(() => {
-    Promise.all([api.getServices(), api.listBookings()])
-      .then(([s, b]) => {
+    guard(() => Promise.all([api.getServices(), api.listBookings()]))
+      .then((res) => {
+        if (!res) return;
+        const [s, b] = res;
         setServices(s.services);
         setBookings(b.bookings);
       })
       .catch((err) => setError(err.message || String(err)));
-  }, []);
+  }, [guard]);
 
   const counts = useMemo(
     () => ({
@@ -59,7 +109,8 @@ export default function AdminApp() {
 
   async function setStatus(id, status) {
     try {
-      const res = await api.updateBookingStatus(id, status);
+      const res = await guard(() => api.updateBookingStatus(id, status));
+      if (!res) return;
       setBookings((prev) => prev.map((b) => (b.id === id ? res.booking : b)));
       if (selected?.id === id) setSelected(res.booking);
     } catch (err) {
@@ -67,9 +118,18 @@ export default function AdminApp() {
     }
   }
 
+  async function handleLogout() {
+    try {
+      await api.logout();
+    } catch {
+      /* ignore */
+    }
+    onUnauthed();
+  }
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", minHeight: "100vh" }}>
-      <AdminSidebar view={view} setView={setView} counts={counts} />
+      <AdminSidebar view={view} setView={setView} counts={counts} onLogout={handleLogout} />
       <main style={{ padding: "32px 40px 60px", overflowX: "hidden" }}>
         <AdminHeader view={view} todayCount={todayBookings.length} />
 
@@ -103,7 +163,7 @@ export default function AdminApp() {
           />
         )}
         {view === "calendar" && <CalendarView services={services} bookings={bookings} />}
-        {view === "clients" && <ClientsView refreshKey={bookings.length} />}
+        {view === "clients" && <ClientsView refreshKey={bookings.length} guard={guard} />}
         {view === "overview" && (
           <OverviewView
             services={services}

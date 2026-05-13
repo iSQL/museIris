@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { fmtRSD, fmtDur, fmtDateLong } from "../data/format.js";
 import Ornament from "../components/Ornament.jsx";
 
@@ -71,7 +72,10 @@ export default function StepConfirmed({ id, service, date, time, onReset }) {
           </span>
         </div>
       </div>
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+        <Link className="btn btn-primary" to="/me">
+          Pogledaj moje termine
+        </Link>
         <button className="btn btn-ghost" onClick={onReset}>
           Zakaži još jedan termin
         </button>

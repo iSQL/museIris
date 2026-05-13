@@ -1,13 +1,12 @@
-import { db } from "../db.js";
-
-const stmt = db.prepare(
-  "SELECT MAX(CAST(SUBSTR(id, 3) AS INTEGER)) AS maxN FROM bookings WHERE id LIKE 'B-%'"
-);
+import { query } from "../db.js";
 
 const MIN_COUNTER = 2500;
 
-export function nextBookingId() {
-  const { maxN } = stmt.get() || { maxN: null };
+export async function nextBookingId() {
+  const { rows } = await query(
+    "SELECT MAX(CAST(SUBSTRING(id FROM 3) AS INTEGER)) AS max_n FROM bookings WHERE id LIKE 'B-%'"
+  );
+  const maxN = rows[0]?.max_n ?? null;
   const n = Math.max(MIN_COUNTER, (maxN || 0) + 1);
   return `B-${n}`;
 }

@@ -1,38 +1,68 @@
-import Database from "better-sqlite3";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import "dotenv/config";
+import pg from "pg";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = resolve(here, "..", "data.db");
+const { Pool, types } = pg;
 
-export const db = new Database(DB_PATH);
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+// Keep DATE and TIME as plain strings ("YYYY-MM-DD" and "HH:MM:SS"). The
+// defaults convert DATE to a JS Date at local-midnight, which a tz-aware
+// toISOString() then shifts back a day for any host in a positive UTC offset
+// (e.g. Europe/Belgrade). Wall-clock at the salon is the source of truth here,
+// so strings are the cleaner shape.
+types.setTypeParser(types.builtins.DATE, (val) => val);
+types.setTypeParser(types.builtins.TIME, (val) => val);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS bookings (
-    id            TEXT PRIMARY KEY,
-    service_id    TEXT NOT NULL,
-    date          TEXT NOT NULL,
-    time          TEXT NOT NULL,
-    status        TEXT NOT NULL CHECK (status IN ('pending','approved','completed','rejected')),
-    client_name   TEXT NOT NULL,
-    client_phone  TEXT NOT NULL,
-    client_email  TEXT,
-    note          TEXT,
-    created_at    TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON bookings(date, status);
-  CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
-`);
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgres://museiris:museiris_dev@localhost:5432/museiris";
 
-export function rowToBooking(row) {
+export const pool = new Pool({
+  connectionString,
+  // Keep the pool small for a single-master salon — most days will see <100
+  // requests; this header keeps idle resources from piling up on Coolify.
+  max: 10,
+  idleTimeoutMillis: 30_000,
+});
+
+pool.on("error", (err) => {
+  console.error("[db] unexpected pool error:", err);
+});
+
+// Thin Pool.query wrapper for one-off statements.
+export const query = (text, params) => pool.query(text, params);
+
+// Convenience for transactional ops; passes a checked-out client to fn.
+export async function withTx(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Map a bookings row (snake_case) to the API shape (camelCase + nested client).
+// Dates come back as JS Date for `date` and as `HH:MM:SS` string for `time` —
+// normalize both to the wall-clock strings the UI/seed already use.
+export function rowToBooking(row, { includeAccessToken = false } = {}) {
   if (!row) return null;
-  return {
+  const date =
+    row.date instanceof Date ? row.date.toISOString().slice(0, 10) : row.date;
+  const time = typeof row.time === "string" ? row.time.slice(0, 5) : row.time;
+  const out = {
     id: row.id,
     service: row.service_id,
-    date: row.date,
-    time: row.time,
+    date,
+    time,
     status: row.status,
     client: {
       name: row.client_name,
@@ -40,6 +70,9 @@ export function rowToBooking(row) {
       email: row.client_email || "",
     },
     note: row.note || "",
-    created: row.created_at,
+    created: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    updated: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };
+  if (includeAccessToken) out.accessToken = row.access_token;
+  return out;
 }

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import ClientApp from "./client/ClientApp.jsx";
 import ServicesPage from "./client/ServicesPage.jsx";
+import MyBookingsPage from "./client/MyBookingsPage.jsx";
 import AdminApp from "./admin/AdminApp.jsx";
 import RoleSwitch from "./components/RoleSwitch.jsx";
 
@@ -17,6 +18,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<ClientApp />} />
           <Route path="/services" element={<ServicesPage />} />
+          <Route path="/me" element={<MyBookingsPage />} />
           <Route path="/admin" element={<AdminApp />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

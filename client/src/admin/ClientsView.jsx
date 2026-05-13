@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import * as api from "../api.js";
 import { fmtRSD, fmtDateShort } from "../data/format.js";
 
-export default function ClientsView({ refreshKey }) {
+export default function ClientsView({ refreshKey, guard }) {
   const [clients, setClients] = useState([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api
-      .listClients()
-      .then((res) => setClients(res.clients))
+    const run = guard ? () => guard(api.listClients) : api.listClients;
+    run()
+      .then((res) => res && setClients(res.clients))
       .catch((err) => setError(err.message || String(err)));
-  }, [refreshKey]);
+  }, [refreshKey, guard]);
 
   const list = clients.filter(
     (c) =>

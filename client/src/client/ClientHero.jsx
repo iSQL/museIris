@@ -54,6 +54,7 @@ export default function ClientHero() {
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <a className="btn btn-primary" href="#booking">Zakaži termin</a>
             <Link className="btn btn-ghost" to="/services">Pogledaj usluge</Link>
+            <Link className="btn btn-ghost" to="/me">Moji termini</Link>
           </div>
           <div style={{ marginTop: 60, display: "flex", gap: 36, flexWrap: "wrap" }}>
             {[

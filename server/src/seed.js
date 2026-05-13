@@ -1,9 +1,13 @@
-import { db } from "./db.js";
+import "dotenv/config";
+import { pathToFileURL } from "node:url";
+import { pool, query, withTx } from "./db.js";
+import { newAccessToken } from "./lib/tokens.js";
 
 const pad2 = (n) => String(n).padStart(2, "0");
-const isoDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const isoDate = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
-// Mirrors makeMockBookings() in data.jsx: 9 demo bookings anchored to today.
+// 9 demo bookings anchored to today.
 function makeSeed() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -12,6 +16,12 @@ function makeSeed() {
     d.setDate(d.getDate() + days);
     return { date: isoDate(d), time: `${pad2(h)}:${pad2(m)}` };
   };
+
+  // Created_at is interpreted server-side as actual timestamps; the v1 "pre 12
+  // minuta" strings are produced for display by the client formatter instead.
+  const now = new Date();
+  const minutesAgo = (m) => new Date(now.getTime() - m * 60_000).toISOString();
+  const daysAgo = (d) => new Date(now.getTime() - d * 24 * 60 * 60_000).toISOString();
 
   return [
     {
@@ -23,7 +33,7 @@ function makeSeed() {
       client_phone: "+381 64 123 4567",
       client_email: "jovana.p@example.rs",
       note: "Volela bih nežne nude tonove, eventualno mat finiš.",
-      created_at: "pre 12 minuta",
+      created_at: minutesAgo(12),
     },
     {
       id: "B-2402",
@@ -34,7 +44,7 @@ function makeSeed() {
       client_phone: "+381 65 987 6543",
       client_email: "milica.dj@example.rs",
       note: "",
-      created_at: "pre 38 minuta",
+      created_at: minutesAgo(38),
     },
     {
       id: "B-2403",
@@ -45,7 +55,7 @@ function makeSeed() {
       client_phone: "+381 60 555 8821",
       client_email: "ana.s@example.rs",
       note: "Babyboomer, tanji oblik kvadrata.",
-      created_at: "pre 1 sat",
+      created_at: minutesAgo(60),
     },
     {
       id: "B-2390",
@@ -56,7 +66,7 @@ function makeSeed() {
       client_phone: "+381 63 200 1144",
       client_email: "tijana@example.rs",
       note: "",
-      created_at: "juče",
+      created_at: daysAgo(1),
     },
     {
       id: "B-2391",
@@ -67,7 +77,7 @@ function makeSeed() {
       client_phone: "+381 62 334 9911",
       client_email: "sanja.ilic@example.rs",
       note: "",
-      created_at: "juče",
+      created_at: daysAgo(1),
     },
     {
       id: "B-2392",
@@ -78,7 +88,7 @@ function makeSeed() {
       client_phone: "+381 64 877 2210",
       client_email: "kat.pavlovic@example.rs",
       note: "",
-      created_at: "pre 2 dana",
+      created_at: daysAgo(2),
     },
     {
       id: "B-2380",
@@ -89,7 +99,7 @@ function makeSeed() {
       client_phone: "+381 65 110 4422",
       client_email: "jelena.n@example.rs",
       note: "",
-      created_at: "pre 5 dana",
+      created_at: daysAgo(5),
     },
     {
       id: "B-2378",
@@ -100,7 +110,7 @@ function makeSeed() {
       client_phone: "+381 63 200 1144",
       client_email: "tijana@example.rs",
       note: "",
-      created_at: "pre 6 dana",
+      created_at: daysAgo(6),
     },
     {
       id: "B-2375",
@@ -111,41 +121,62 @@ function makeSeed() {
       client_phone: "+381 60 221 7788",
       client_email: "marina.v@example.rs",
       note: "Termin nije odgovarao salonu.",
-      created_at: "pre 2 dana",
+      created_at: daysAgo(2),
     },
   ];
 }
 
-export function seed() {
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO bookings
-       (id, service_id, date, time, status, client_name, client_phone, client_email, note, created_at)
-     VALUES
-       (@id, @service_id, @date, @time, @status, @client_name, @client_phone, @client_email, @note, @created_at)`
-  );
+export async function seed() {
   const rows = makeSeed();
-  const tx = db.transaction((items) => {
+  return withTx(async (client) => {
     let inserted = 0;
-    for (const r of items) {
-      const info = insert.run(r);
-      inserted += info.changes;
+    for (const r of rows) {
+      const { rowCount } = await client.query(
+        `INSERT INTO bookings
+           (id, service_id, date, time, status, client_name, client_phone,
+            client_email, note, access_token, created_at, updated_at)
+         VALUES
+           ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          r.id,
+          r.service_id,
+          r.date,
+          r.time,
+          r.status,
+          r.client_name,
+          r.client_phone,
+          r.client_email,
+          r.note || null,
+          newAccessToken(),
+          r.created_at,
+        ]
+      );
+      inserted += rowCount;
     }
     return inserted;
   });
-  return tx(rows);
 }
 
-export function runSeedIfEmpty() {
-  const { n } = db.prepare("SELECT COUNT(*) AS n FROM bookings").get();
+export async function runSeedIfEmpty() {
+  const { rows } = await query("SELECT COUNT(*)::int AS n FROM bookings");
+  const n = rows[0]?.n ?? 0;
   if (n === 0) {
-    const inserted = seed();
+    const inserted = await seed();
     console.log(`[seed] inserted ${inserted} demo bookings.`);
   }
 }
 
-// Run as a script: `node src/seed.js`
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
-  const inserted = seed();
-  console.log(`[seed] inserted/ignored ${inserted} demo bookings.`);
-  process.exit(0);
+const invokedAsScript =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedAsScript) {
+  seed()
+    .then((n) => {
+      console.log(`[seed] inserted/ignored ${n} demo bookings.`);
+      return pool.end();
+    })
+    .catch((err) => {
+      console.error("[seed] failed:", err);
+      pool.end().finally(() => process.exit(1));
+    });
 }
