@@ -78,16 +78,27 @@ Point Coolify at this repo and select the `Dockerfile` build pack. Internal port
 | Var | Notes |
 | --- | --- |
 | `DATABASE_URL` | `postgres://user:pass@host:5432/db` — use the Coolify Postgres' internal hostname |
-| `ADMIN_PASSWORD_HASH` | bcrypt hash generated via `npm run hash-password` |
-| `JWT_SECRET` | Long random string (≥ 16 chars); rotate to invalidate all sessions |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash generated via `npm run hash-password`. **Escape every `$` as `$$` in Coolify** — see Coolify gotchas below |
+| `JWT_SECRET` | Long random string (≥ 16 chars); rotate to invalidate all sessions. Avoid `$` in the value (or `$$`-escape) |
 | `COOKIE_SECURE` | `true` (HTTPS) |
-| `NODE_ENV` | `production` |
+| `NODE_ENV` | `production` — **Runtime only, NOT Available at Buildtime** (would skip Vite devDeps and break the build) |
 | `PORT` | `3001` (Coolify reverse-proxies this) |
 | `SEED_DEMO` | `false` to skip the 9-row demo seed on first boot (recommended for prod) |
 
 On every boot the server runs pending migrations (`server/db/migrations/*.sql`) and — unless `SEED_DEMO=false` — seeds an empty `bookings` table. Both operations are idempotent.
 
 The Dockerfile includes a `HEALTHCHECK` that probes `/api/health` every 30 s, so Coolify (and any other orchestrator that respects Docker healthchecks) can mark stuck containers unhealthy.
+
+### Coolify gotchas
+
+These bit us during the first deploy. Worth knowing up front:
+
+- **bcrypt hashes contain `$`** — Coolify pipes env values through a compose-style layer that interprets `$NAME` as variable substitution. The bcrypt format `$2a$10$…` is read as three empty-variable references and the hash gets mangled into a fragment that bcrypt can't validate.
+  - **Workaround:** in Coolify's env-vars panel, **double every `$`**. Paste `$$2a$$10$$bedLthxq…` instead of `$2a$10$bedLthxq…`. The compose layer collapses `$$` back to `$`, and the container receives the real hash.
+  - Verify after deploy: open the container Terminal and run `printenv ADMIN_PASSWORD_HASH`. It should print the original `$2a$10$…` form. If it's truncated, the `$$` escape is missing.
+  - The same rule applies to any other secret that contains a literal `$` (e.g. a `JWT_SECRET` with a `$` in it). Easiest path is to use secrets without `$` to begin with.
+- **`NODE_ENV` must be Runtime only.** If marked "Available at Buildtime", npm sees `NODE_ENV=production` during the build stage, skips `devDependencies`, and `vite build` fails with `sh: vite: not found`. The Dockerfile defensively pins `ENV NODE_ENV=development` for the build stages, but flipping the Coolify toggle off is the right config either way.
+- **Verify the env reached the container.** When something behaves oddly post-deploy, your first move should be `printenv VARNAME` inside the container shell — it's the only ground truth.
 
 ## Features
 
