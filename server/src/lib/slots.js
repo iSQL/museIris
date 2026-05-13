@@ -1,11 +1,6 @@
 import { query } from "../db.js";
-import {
-  WORKING_HOURS,
-  SLOT_STEP,
-  LEAD_TIME_MIN,
-  findService,
-  SERVICES,
-} from "../data/services.js";
+import { findService } from "./services.js";
+import { getConfig } from "./config.js";
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const toMin = (hhmm) => {
@@ -14,16 +9,18 @@ const toMin = (hhmm) => {
 };
 const fromMin = (m) => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
 
-function rowsToRanges(rows) {
-  return rows.map((row) => {
-    const svc = SERVICES.find((s) => s.id === row.service_id);
-    const t = typeof row.time === "string" ? row.time.slice(0, 5) : row.time;
-    const start = toMin(t);
-    return [start, start + (svc?.duration || 60)];
-  });
+// Fetch service durations for the given booking rows in one shot, to avoid
+// N+1 queries when computing taken ranges.
+async function loadDurationsFor(serviceIds) {
+  if (serviceIds.length === 0) return new Map();
+  const unique = [...new Set(serviceIds)];
+  const { rows } = await query(
+    "SELECT id, duration FROM services WHERE id = ANY($1)",
+    [unique]
+  );
+  return new Map(rows.map((r) => [r.id, r.duration]));
 }
 
-// Fetch active bookings for `date`, optionally excluding one (used by reschedule).
 async function fetchTaken(date, ignoreBookingId = null) {
   const params = [date];
   let sql =
@@ -33,10 +30,15 @@ async function fetchTaken(date, ignoreBookingId = null) {
     sql += " AND id <> $2";
   }
   const { rows } = await query(sql, params);
-  return rowsToRanges(rows);
+  const durations = await loadDurationsFor(rows.map((r) => r.service_id));
+  return rows.map((row) => {
+    const t = typeof row.time === "string" ? row.time.slice(0, 5) : row.time;
+    const start = toMin(t);
+    const dur = durations.get(row.service_id) ?? 60;
+    return [start, start + dur];
+  });
 }
 
-// Returns taken minute ranges for `date` (YYYY-MM-DD).
 export async function takenRangesOn(date, ignoreBookingId = null) {
   return fetchTaken(date, ignoreBookingId);
 }
@@ -44,12 +46,13 @@ export async function takenRangesOn(date, ignoreBookingId = null) {
 // Server-mirrored equivalent of the prototype's StepTime slot generator.
 // Returns [{ time: "HH:MM", taken, past }] for the (date, service) pair.
 export async function generateSlots(date, serviceId, ignoreBookingId = null) {
-  const service = findService(serviceId);
+  const service = await findService(serviceId);
   if (!service) return [];
   const d = new Date(`${date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return [];
 
-  const hours = WORKING_HOURS[d.getDay()];
+  const config = await getConfig();
+  const hours = config.workingHours?.[String(d.getDay())];
   if (!hours) return [];
 
   const [open, close] = hours;
@@ -66,9 +69,9 @@ export async function generateSlots(date, serviceId, ignoreBookingId = null) {
   const nowM = now.getHours() * 60 + now.getMinutes();
 
   const result = [];
-  for (let t = openM; t + service.duration <= closeM; t += SLOT_STEP) {
+  for (let t = openM; t + service.duration <= closeM; t += config.slotStep) {
     const overlaps = taken.some(([s, e]) => t < e && t + service.duration > s);
-    const inPast = isToday && t < nowM + LEAD_TIME_MIN;
+    const inPast = isToday && t < nowM + config.leadTimeMin;
     result.push({ time: fromMin(t), taken: overlaps, past: inPast });
   }
   return result;
@@ -77,12 +80,15 @@ export async function generateSlots(date, serviceId, ignoreBookingId = null) {
 // Returns null if the slot is fine to book; an error message otherwise.
 // `ignoreBookingId` lets reschedule exclude the booking being moved.
 export async function validateSlot(date, time, serviceId, ignoreBookingId = null) {
-  const service = findService(serviceId);
+  const service = await findService(serviceId);
   if (!service) return "Nepoznata usluga.";
+  if (service.archived) return "Usluga više nije dostupna.";
 
   const d = new Date(`${date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return "Neispravan datum.";
-  const hours = WORKING_HOURS[d.getDay()];
+
+  const config = await getConfig();
+  const hours = config.workingHours?.[String(d.getDay())];
   if (!hours) return "Tog dana atelje ne radi.";
 
   const [open, close] = hours;
@@ -101,8 +107,9 @@ export async function validateSlot(date, time, serviceId, ignoreBookingId = null
   if (date < todayIso) return "Termin je u prošlosti.";
   if (date === todayIso) {
     const nowM = now.getHours() * 60 + now.getMinutes();
-    if (t < nowM + LEAD_TIME_MIN)
-      return "Termin se zakazuje najmanje 30 minuta unapred.";
+    if (t < nowM + config.leadTimeMin) {
+      return `Termin se zakazuje najmanje ${config.leadTimeMin} minuta unapred.`;
+    }
   }
 
   const taken = await fetchTaken(date, ignoreBookingId);

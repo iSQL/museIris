@@ -64,6 +64,23 @@ export const updateBookingStatus = (id, status) =>
   });
 export const listClients = () => jsonFetch("/api/clients");
 
+// admin: full service catalogue (incl. archived)
+export const listAllServices = () => jsonFetch("/api/services/all");
+export const createService = (data) =>
+  jsonFetch("/api/services", { method: "POST", body: JSON.stringify(data) });
+export const updateService = (id, edits) =>
+  jsonFetch(`/api/services/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(edits),
+  });
+export const deleteService = (id) =>
+  jsonFetch(`/api/services/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+// admin: salon config (working hours, slot step, lead time)
+export const getConfig = () => jsonFetch("/api/config");
+export const updateConfig = (edits) =>
+  jsonFetch("/api/config", { method: "PATCH", body: JSON.stringify(edits) });
+
 // ─── auth ──────────────────────────────────────────────────────────────────
 export const login = (password) =>
   jsonFetch("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) });

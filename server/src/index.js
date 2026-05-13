@@ -11,6 +11,7 @@ import authRouter from "./routes/auth.js";
 import servicesRouter from "./routes/services.js";
 import bookingsRouter from "./routes/bookings.js";
 import clientsRouter from "./routes/clients.js";
+import configRouter from "./routes/config.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +24,7 @@ app.use("/api/auth", authRouter);
 app.use("/api", servicesRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/clients", clientsRouter);
+app.use("/api/config", configRouter);
 
 // In production the same container serves the built SPA on /. Vite handles
 // this in dev via its own server on :5173.

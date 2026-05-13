@@ -6,6 +6,8 @@ export default function AdminSidebar({ view, setView, counts, onLogout }) {
     { id: "requests", label: "Zahtevi", badge: counts.pending },
     { id: "calendar", label: "Kalendar" },
     { id: "clients", label: "Klijenti" },
+    { id: "services", label: "Usluge" },
+    { id: "settings", label: "Podešavanja" },
   ];
 
   return (

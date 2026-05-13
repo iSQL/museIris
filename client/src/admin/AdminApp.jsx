@@ -9,6 +9,8 @@ import OverviewView from "./OverviewView.jsx";
 import RequestsView from "./RequestsView.jsx";
 import CalendarView from "./CalendarView.jsx";
 import ClientsView from "./ClientsView.jsx";
+import ServicesView from "./ServicesView.jsx";
+import SettingsView from "./SettingsView.jsx";
 
 // auth state: null = checking, false = logged out, true = logged in
 export default function AdminApp() {
@@ -43,6 +45,7 @@ export default function AdminApp() {
 
 function Dashboard({ onUnauthed }) {
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [view, setView] = useState("requests");
   const [filter, setFilter] = useState("all");
@@ -66,16 +69,27 @@ function Dashboard({ onUnauthed }) {
     [onUnauthed]
   );
 
-  useEffect(() => {
-    guard(() => Promise.all([api.getServices(), api.listBookings()]))
-      .then((res) => {
+  const reload = useCallback(
+    async () => {
+      try {
+        const res = await guard(() =>
+          Promise.all([api.listAllServices(), api.listBookings()])
+        );
         if (!res) return;
         const [s, b] = res;
         setServices(s.services);
+        setCategories(s.categories);
         setBookings(b.bookings);
-      })
-      .catch((err) => setError(err.message || String(err)));
-  }, [guard]);
+      } catch (err) {
+        setError(err.message || String(err));
+      }
+    },
+    [guard]
+  );
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const counts = useMemo(
     () => ({
@@ -173,6 +187,15 @@ function Dashboard({ onUnauthed }) {
             monthRevenue={monthRevenue}
           />
         )}
+        {view === "services" && (
+          <ServicesView
+            services={services}
+            categories={categories}
+            guard={guard}
+            onChanged={reload}
+          />
+        )}
+        {view === "settings" && <SettingsView guard={guard} />}
       </main>
     </div>
   );

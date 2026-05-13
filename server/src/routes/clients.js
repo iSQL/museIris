@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { query } from "../db.js";
-import { SERVICES } from "../data/services.js";
+import { listAll } from "../lib/services.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
@@ -11,9 +11,11 @@ router.use(requireAuth);
 // favCat = the service category appearing most often in non-rejected bookings.
 router.get("/", async (_req, res, next) => {
   try {
-    const { rows } = await query(
-      "SELECT * FROM bookings ORDER BY date DESC"
-    );
+    const [{ rows }, services] = await Promise.all([
+      query("SELECT * FROM bookings ORDER BY date DESC"),
+      listAll(),
+    ]);
+    const byId = new Map(services.map((s) => [s.id, s]));
 
     const map = new Map();
     for (const b of rows) {
@@ -31,7 +33,7 @@ router.get("/", async (_req, res, next) => {
       };
       if (b.status === "completed" || b.status === "approved") prev.visits += 1;
       if (!prev.lastDate || dateStr > prev.lastDate) prev.lastDate = dateStr;
-      const svc = SERVICES.find((s) => s.id === b.service_id);
+      const svc = byId.get(b.service_id);
       if (svc && b.status !== "rejected") {
         if (b.status === "completed") prev.spent += svc.price;
         prev._cats[svc.cat] = (prev._cats[svc.cat] || 0) + 1;

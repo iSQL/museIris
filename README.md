@@ -21,7 +21,7 @@ Serbian-language ("sr-Latn") booking web app for **Muse Iris**, a one-master man
 │       ├── App.jsx               # routes: /, /services, /me, /admin
 │       ├── components/           # BrandMark, MonthCalendar, Stepper, StatusChip, …
 │       ├── client/               # booking flow + ServicesPage + MyBookingsPage + RescheduleModal
-│       ├── admin/                # AdminApp, Login, Sidebar, OverviewView, RequestsView, …
+│       ├── admin/                # AdminApp, Login, Sidebar, OverviewView, RequestsView, ServicesView, ServiceFormModal, SettingsView, …
 │       ├── data/format.js        # Serbian formatters (fmtRSD, fmtDateLong, fmtRelativeTime, …)
 │       ├── lib/myBookings.js     # localStorage cache of customer access tokens
 │       └── styles.css            # design tokens + hoisted component styles
@@ -30,10 +30,10 @@ Serbian-language ("sr-Latn") booking web app for **Muse Iris**, a one-master man
 │   └── src/
 │       ├── index.js              # bootstrap: dotenv → migrate → seed → listen
 │       ├── db.js                 # pg Pool, query(), withTx(), rowToBooking()
-│       ├── data/services.js      # service catalogue + working hours (source of truth)
-│       ├── lib/                  # auth, hashPassword, migrate, slots, nextId, tokens
+│       ├── data/services.js      # CATEGORIES enum (catalogue itself is in DB)
+│       ├── lib/                  # auth, hashPassword, migrate, slots, nextId, tokens, services, config
 │       ├── middleware/requireAuth.js
-│       ├── routes/               # health, auth, services, bookings, clients
+│       ├── routes/               # health, auth, services, bookings, clients, config
 │       └── seed.js               # idempotent 9-row demo seed
 ├── Dockerfile                    # multi-stage: deps → build → runtime
 ├── docker-compose.yml            # Postgres only (dev convenience)
@@ -100,8 +100,10 @@ The Dockerfile includes a `HEALTHCHECK` that probes `/api/health` every 30 s, so
 
 **Admin (gated by single shared password)**
 - Login screen at `/admin` (no separate URL). JWT in httpOnly cookie, 7-day TTL.
-- Dashboard: **Pregled** (overview) · **Zahtevi** (requests + filters + detail panel) · **Kalendar** (month grid) · **Klijenti** (aggregated client list).
-- Actions: approve / reject / mark completed (subject to the state machine below).
+- Dashboard: **Pregled** (overview) · **Zahtevi** (requests + filters + detail panel) · **Kalendar** (month grid) · **Klijenti** (aggregated client list) · **Usluge** (service CRUD) · **Podešavanja** (working hours, slot step, lead time).
+- Booking actions: approve / reject / mark completed (subject to the state machine below).
+- Service actions: create / edit / archive / hard-delete. Hard delete is blocked (`409`) when bookings reference the service; the modal offers "Arhiviraj umesto toga" as a one-click fallback.
+- Settings: per-day open/close pickers (Sundays closeable), 4-option slot raster (15/30/45/60 min), lead-time minutes. Changes take effect immediately for new bookings + availability queries.
 - "Odjavi se" in the sidebar.
 
 ### Booking state machine
@@ -141,6 +143,12 @@ The Dockerfile includes a `HEALTHCHECK` that probes `/api/health` every 30 s, so
 | GET | `/api/bookings/:id` | admin | Single booking |
 | PATCH | `/api/bookings/:id` | admin | Status transition |
 | GET | `/api/clients` | admin | Aggregated client list |
+| GET | `/api/services/all` | admin | All services incl. archived (used by admin views) |
+| POST | `/api/services` | admin | Create a service |
+| PATCH | `/api/services/:id` | admin | Edit / archive / un-archive |
+| DELETE | `/api/services/:id` | admin | Hard delete; **409** if referenced by any booking |
+| GET | `/api/config` | admin | `{ workingHours, slotStep, leadTimeMin, updatedAt }` |
+| PATCH | `/api/config` | admin | Partial config update |
 | POST | `/api/auth/login` | — | Body `{ password }`; sets httpOnly cookie |
 | POST | `/api/auth/logout` | — | Clears cookie |
 | GET | `/api/auth/me` | — | Returns `{ authed }` |
@@ -164,6 +172,7 @@ The Dockerfile includes a `HEALTHCHECK` that probes `/api/health` every 30 s, so
 - **Demo seed.** First boot inserts 9 demo bookings if `bookings` is empty (see `server/src/seed.js`). Subsequent boots are no-ops. For a clean production start, set `SEED_DEMO=false` in Coolify before the first deploy — or run `DELETE FROM bookings;` once afterward.
 - **`/api/health`.** Returns `{ ok: true, ts }`. Used by Coolify and any external monitor.
 - **Single-master assumption.** There's one admin password; "Klijenti" view aggregates per `client_email || client_phone`. Multi-master support would require adding a master/user table and per-booking ownership.
+- **Catalogue & schedule are DB-backed.** Services live in the `services` table (managed via `/admin` → Usluge); the salon-wide config (working hours, slot step, lead time) is a singleton row in `salon_config` (managed via `/admin` → Podešavanja). Bookings reference services through a `FOREIGN KEY … ON DELETE RESTRICT`; archive (`PATCH { archived: true }`) is the safe retirement path, hard `DELETE` only succeeds for unused services.
 
 ## TODOs (out of scope)
 
@@ -172,3 +181,7 @@ The Dockerfile includes a `HEALTHCHECK` that probes `/api/health` every 30 s, so
 - Multiple admin accounts.
 - Phone-based booking recovery if the customer clears `localStorage`.
 - Editing customer name/phone/email after the booking is created.
+- Editable categories (currently the three categories are a fixed enum in `server/src/data/services.js`).
+- Drag-and-drop service reordering (currently `sortOrder` is a number input).
+- Customer-side display fallback when their booking references an archived service (shows the bare id; admin views resolve the name via `listAllServices`).
+- Audit log of who changed which service/config when (only `updated_at` is tracked).

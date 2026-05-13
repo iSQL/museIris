@@ -3,7 +3,7 @@ import { query, rowToBooking } from "../db.js";
 import { generateSlots, validateSlot } from "../lib/slots.js";
 import { nextBookingId } from "../lib/nextId.js";
 import { newAccessToken } from "../lib/tokens.js";
-import { findService } from "../data/services.js";
+import { findService } from "../lib/services.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
@@ -196,7 +196,8 @@ router.post("/", async (req, res, next) => {
 
     if (!name) return res.status(400).json({ error: "Ime je obavezno." });
     if (!phone) return res.status(400).json({ error: "Telefon je obavezan." });
-    if (!serviceId || !findService(serviceId))
+    const svc = serviceId ? await findService(serviceId) : null;
+    if (!svc || svc.archived)
       return res.status(400).json({ error: "Usluga nije važeća." });
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
       return res.status(400).json({ error: "Datum nije u ispravnom formatu." });
