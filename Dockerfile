@@ -40,4 +40,9 @@ COPY server/db ./server/db
 COPY --from=build /app/client/dist ./client/dist
 
 EXPOSE 3001
+
+# BusyBox wget ships in node:22-alpine; --spider just probes without fetching the body.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+  CMD wget --quiet --spider http://localhost:3001/api/health || exit 1
+
 CMD ["node", "server/src/index.js"]

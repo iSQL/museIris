@@ -159,6 +159,12 @@ export async function seed() {
 }
 
 export async function runSeedIfEmpty() {
+  // Opt out by setting SEED_DEMO=false in env. Defaults on so local dev gets
+  // the 9 demo rows automatically; production typically wants an empty table.
+  if (process.env.SEED_DEMO === "false") {
+    console.log("[seed] SEED_DEMO=false — skipping demo seed.");
+    return;
+  }
   const { rows } = await query("SELECT COUNT(*)::int AS n FROM bookings");
   const n = rows[0]?.n ?? 0;
   if (n === 0) {

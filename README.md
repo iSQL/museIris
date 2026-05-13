@@ -83,8 +83,11 @@ Point Coolify at this repo and select the `Dockerfile` build pack. Internal port
 | `COOKIE_SECURE` | `true` (HTTPS) |
 | `NODE_ENV` | `production` |
 | `PORT` | `3001` (Coolify reverse-proxies this) |
+| `SEED_DEMO` | `false` to skip the 9-row demo seed on first boot (recommended for prod) |
 
-On every boot the server runs pending migrations (`server/db/migrations/*.sql`) and seeds an empty `bookings` table. Both operations are idempotent.
+On every boot the server runs pending migrations (`server/db/migrations/*.sql`) and — unless `SEED_DEMO=false` — seeds an empty `bookings` table. Both operations are idempotent.
+
+The Dockerfile includes a `HEALTHCHECK` that probes `/api/health` every 30 s, so Coolify (and any other orchestrator that respects Docker healthchecks) can mark stuck containers unhealthy.
 
 ## Features
 
@@ -158,7 +161,7 @@ On every boot the server runs pending migrations (`server/db/migrations/*.sql`) 
 ## Notes
 
 - **Time zone.** Appointment `date`/`time` columns are tz-naive (Postgres `DATE` + `TIME`) and read as raw strings; the salon's wall clock (Europe/Belgrade) is the source of truth. Custom `pg` type parsers in `server/src/db.js` prevent the default `DATE → JS Date at local midnight` round-trip from shifting dates by a day in positive UTC offsets.
-- **Demo seed.** First boot inserts 9 demo bookings if `bookings` is empty (see `server/src/seed.js`). Subsequent boots are no-ops. For a clean production start, run `DELETE FROM bookings;` once after first deploy, or replace the seed with your own.
+- **Demo seed.** First boot inserts 9 demo bookings if `bookings` is empty (see `server/src/seed.js`). Subsequent boots are no-ops. For a clean production start, set `SEED_DEMO=false` in Coolify before the first deploy — or run `DELETE FROM bookings;` once afterward.
 - **`/api/health`.** Returns `{ ok: true, ts }`. Used by Coolify and any external monitor.
 - **Single-master assumption.** There's one admin password; "Klijenti" view aggregates per `client_email || client_phone`. Multi-master support would require adding a master/user table and per-booking ownership.
 
