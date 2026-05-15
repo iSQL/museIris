@@ -2,7 +2,10 @@ import { Link } from "react-router-dom";
 import { fmtRSD, fmtDur, fmtDateLong } from "../data/format.js";
 import Ornament from "../components/Ornament.jsx";
 
-export default function StepConfirmed({ id, service, date, time, onReset }) {
+export default function StepConfirmed({ id, service, date, time, coupon, onReset }) {
+  const discount = coupon?.discount || 0;
+  const hasDiscount = service && discount > 0;
+  const finalPrice = service ? Math.max(0, service.price - discount) : null;
   return (
     <div style={{ textAlign: "center", padding: "20px 0 10px" }}>
       <Ornament width={50} />
@@ -68,8 +71,24 @@ export default function StepConfirmed({ id, service, date, time, onReset }) {
               fontSize: 17,
             }}
           >
-            {time.label} · {fmtDur(service.duration)} · {fmtRSD(service.price)}
+            {time.label} · {fmtDur(service.duration)} ·{" "}
+            {hasDiscount ? (
+              <>
+                <span style={{ textDecoration: "line-through", opacity: 0.55, marginRight: 6 }}>
+                  {fmtRSD(service.price)}
+                </span>
+                {fmtRSD(finalPrice)}
+              </>
+            ) : (
+              fmtRSD(service.price)
+            )}
           </span>
+          {hasDiscount && (
+            <span style={{ fontSize: 12, color: "var(--bronze)", letterSpacing: "0.12em" }}>
+              Kupon <strong style={{ color: "var(--gold)" }}>{coupon.code}</strong> primenjen — ušteda{" "}
+              {fmtRSD(discount)}
+            </span>
+          )}
         </div>
       </div>
       <div style={{ marginTop: 32, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>

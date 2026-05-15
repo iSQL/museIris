@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { query, rowToBooking } from "../db.js";
+import { query, withTx, rowToBooking } from "../db.js";
 import { generateSlots, validateSlot } from "../lib/slots.js";
 import { nextBookingId } from "../lib/nextId.js";
 import { newAccessToken } from "../lib/tokens.js";
 import { findService } from "../lib/services.js";
+import { consumeActivation, resolveDiscount } from "../lib/coupons.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
@@ -194,6 +195,7 @@ router.post("/", async (req, res, next) => {
     const serviceId = body.service;
     const date = body.date;
     const time = body.time;
+    const couponCode = (body.couponCode || "").trim().toUpperCase() || null;
 
     if (!name) return res.status(400).json({ error: "Ime je obavezno." });
     if (!phone) return res.status(400).json({ error: "Telefon je obavezan." });
@@ -211,20 +213,44 @@ router.post("/", async (req, res, next) => {
     const id = await nextBookingId();
     const accessToken = newAccessToken();
 
-    await query(
-      `INSERT INTO bookings
-         (id, service_id, date, time, status, client_name, client_phone,
-          client_email, note, access_token)
-       VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9)`,
-      [id, serviceId, date, time, name, phone, email || null, note || null, accessToken]
-    );
+    // Coupon + booking insert run in a single transaction so we never charge
+    // an activation against a coupon and then fail to insert the booking row.
+    const booking = await withTx(async (client) => {
+      let couponDiscount = null;
+      let storedCouponCode = null;
+      if (couponCode) {
+        const consumed = await consumeActivation(couponCode, client);
+        if (!consumed) {
+          const err = new Error("Kupon nije važeći ili je iskorišćen.");
+          err.status = 409;
+          throw err;
+        }
+        couponDiscount = resolveDiscount(consumed, svc.price);
+        storedCouponCode = consumed.code;
+      }
 
-    const { rows } = await query("SELECT * FROM bookings WHERE id = $1", [id]);
-    res.status(201).json({
-      booking: rowToBooking(rows[0]),
-      accessToken,
+      await client.query(
+        `INSERT INTO bookings
+           (id, service_id, date, time, status, client_name, client_phone,
+            client_email, note, access_token, coupon_code, coupon_discount)
+         VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          id, serviceId, date, time, name, phone,
+          email || null, note || null, accessToken,
+          storedCouponCode, couponDiscount,
+        ]
+      );
+
+      const { rows } = await client.query(
+        "SELECT * FROM bookings WHERE id = $1",
+        [id]
+      );
+      return rowToBooking(rows[0]);
     });
+
+    res.status(201).json({ booking, accessToken });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);
   }
 });

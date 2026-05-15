@@ -36,6 +36,12 @@ export default function ClientApp() {
   const [slots, setSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
+  // { code, discount, discountPercent?, discountAmount? } — discount is the
+  // resolved RSD value for the currently selected service. Validated server-side
+  // again at submit time.
+  const [coupon, setCoupon] = useState(null);
+  const [pendingCouponCode, setPendingCouponCode] = useState(null);
+
   useEffect(() => {
     Promise.all([api.getServices(), api.getWorkingHours()])
       .then(([s, w]) => {
@@ -48,16 +54,53 @@ export default function ClientApp() {
 
   // Pre-select a service when arriving via /?service=<id> from the services page.
   // Consume the query param once services have loaded, then clear it so a later
-  // "Zakaži još jedan termin" reset starts fresh.
+  // "Zakaži još jedan termin" reset starts fresh. Also lift the ?coupon= code so
+  // we can validate it as soon as a service is picked.
   useEffect(() => {
     if (services.length === 0) return;
     const preselectId = searchParams.get("service");
-    if (!preselectId) return;
-    const svc = services.find((s) => s.id === preselectId);
-    if (svc) setSelectedService(svc);
-    setSearchParams({}, { replace: true });
+    if (preselectId) {
+      const svc = services.find((s) => s.id === preselectId);
+      if (svc) setSelectedService(svc);
+    }
+    const couponParam = searchParams.get("coupon");
+    if (couponParam) setPendingCouponCode(couponParam.toUpperCase());
+    if (preselectId || couponParam) setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [services]);
+
+  // Re-validate the coupon whenever the service changes — the resolved RSD
+  // discount depends on service price. Also runs once when a ?coupon= URL
+  // param hits without a pre-selected service: the validation waits until
+  // the customer picks one.
+  useEffect(() => {
+    const code = pendingCouponCode || coupon?.code;
+    if (!code) return;
+    if (!selectedService) return;
+    let cancelled = false;
+    api
+      .validateCoupon(code, selectedService.id)
+      .then((res) => {
+        if (cancelled) return;
+        setCoupon({
+          code: res.code,
+          discount: res.discount || 0,
+          discountPercent: res.discountPercent,
+          discountAmount: res.discountAmount,
+        });
+        setPendingCouponCode(null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Drop silently if the URL-supplied / previously-applied code is no
+        // longer valid; the customer can re-enter on Step 4 if they want to.
+        setCoupon(null);
+        setPendingCouponCode(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedService, pendingCouponCode]);
 
   // Refetch slots when date/service change
   useEffect(() => {
@@ -98,6 +141,7 @@ export default function ClientApp() {
         time: selectedTime.label,
         client: { name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim() },
         note: form.note.trim(),
+        couponCode: coupon?.code || null,
       });
       addEntry({ id: res.booking.id, accessToken: res.accessToken });
       setSubmittedId(res.booking.id);
@@ -117,6 +161,8 @@ export default function ClientApp() {
     setForm({ name: "", phone: "", email: "", note: "", consent: false });
     setSubmittedId(null);
     setSubmitError(null);
+    setCoupon(null);
+    setPendingCouponCode(null);
   }
 
   return (
@@ -198,11 +244,20 @@ export default function ClientApp() {
                 service={selectedService}
               />
             )}
-            {step === 3 && <StepDetails form={form} setForm={setForm} />}
+            {step === 3 && (
+              <StepDetails
+                form={form}
+                setForm={setForm}
+                service={selectedService}
+                coupon={coupon}
+                setCoupon={setCoupon}
+              />
+            )}
             {step === 4 && (
               <StepConfirmed
                 id={submittedId}
                 service={selectedService}
+                coupon={coupon}
                 date={selectedDate}
                 time={selectedTime}
                 onReset={reset}
@@ -223,7 +278,12 @@ export default function ClientApp() {
                 flexWrap: "wrap",
               }}
             >
-              <BookingSummary service={selectedService} date={selectedDate} time={selectedTime} />
+              <BookingSummary
+                service={selectedService}
+                date={selectedDate}
+                time={selectedTime}
+                coupon={coupon}
+              />
 
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 {submitError && (

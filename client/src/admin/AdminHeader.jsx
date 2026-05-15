@@ -5,6 +5,9 @@ const TITLES = {
   requests: ["Zahtevi za termine", "Pregledajte i potvrdite nove zahteve"],
   calendar: ["Kalendar", "Vizuelni pregled svih potvrđenih termina"],
   clients: ["Klijenti", "Sve dame koje su prošle kroz atelje"],
+  services: ["Usluge", "Vaš katalog tretmana"],
+  coupons: ["Kuponi", "Promotivni kodovi i popusti"],
+  settings: ["Podešavanja", "Radno vreme i pravila ateljea"],
 };
 
 export default function AdminHeader({ view, todayCount }) {

@@ -7,6 +7,7 @@ export default function AdminSidebar({ view, setView, counts, onLogout }) {
     { id: "calendar", label: "Kalendar" },
     { id: "clients", label: "Klijenti" },
     { id: "services", label: "Usluge" },
+    { id: "coupons", label: "Kuponi" },
     { id: "settings", label: "Podešavanja" },
   ];
 

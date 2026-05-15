@@ -70,6 +70,9 @@ export function rowToBooking(row, { includeAccessToken = false } = {}) {
       email: row.client_email || "",
     },
     note: row.note || "",
+    coupon: row.coupon_code
+      ? { code: row.coupon_code, discount: row.coupon_discount || 0 }
+      : null,
     created: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updated: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };

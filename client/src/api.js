@@ -81,6 +81,23 @@ export const getConfig = () => jsonFetch("/api/config");
 export const updateConfig = (edits) =>
   jsonFetch("/api/config", { method: "PATCH", body: JSON.stringify(edits) });
 
+// coupons — public validate, admin CRUD
+export const validateCoupon = (code, serviceId) => {
+  const qs = new URLSearchParams({ code });
+  if (serviceId) qs.set("serviceId", serviceId);
+  return jsonFetch(`/api/coupons/validate?${qs.toString()}`);
+};
+export const listCoupons = () => jsonFetch("/api/coupons");
+export const createCoupon = (data) =>
+  jsonFetch("/api/coupons", { method: "POST", body: JSON.stringify(data) });
+export const updateCoupon = (id, edits) =>
+  jsonFetch(`/api/coupons/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(edits),
+  });
+export const deleteCoupon = (id) =>
+  jsonFetch(`/api/coupons/${encodeURIComponent(id)}`, { method: "DELETE" });
+
 // ─── auth ──────────────────────────────────────────────────────────────────
 export const login = (password) =>
   jsonFetch("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) });

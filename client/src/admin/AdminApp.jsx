@@ -10,6 +10,7 @@ import RequestsView from "./RequestsView.jsx";
 import CalendarView from "./CalendarView.jsx";
 import ClientsView from "./ClientsView.jsx";
 import ServicesView from "./ServicesView.jsx";
+import CouponsView from "./CouponsView.jsx";
 import SettingsView from "./SettingsView.jsx";
 
 // auth state: null = checking, false = logged out, true = logged in
@@ -196,6 +197,7 @@ function Dashboard({ onUnauthed }) {
             onChanged={reload}
           />
         )}
+        {view === "coupons" && <CouponsView guard={guard} />}
         {view === "settings" && <SettingsView guard={guard} />}
       </main>
     </div>
